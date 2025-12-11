@@ -27,7 +27,7 @@ class Text2ImageInputField(BaseModel):
 class Image2ImageInputField(BaseModel):
     prompt: str = Field(...)
     negative_prompt: Optional[str] = Field(None)
-    images: list[str] = Field(..., min_length=1, max_length=2)
+    images: list[str] = Field(..., min_length=1, max_length=3)
 
 
 class Text2VideoInputField(BaseModel):
@@ -356,11 +356,13 @@ class WanImageToImageApi(IO.ComfyNode):
         watermark: bool = True,
     ):
         n_images = get_number_of_images(image)
-        if n_images not in (1, 2):
-            raise ValueError(f"Expected 1 or 2 input images, got {n_images}.")
+        if n_images not in (1, 2, 3):
+            raise ValueError(f"Expected 1, 2 or 3 input images, got {n_images}.")
         images = []
         for i in image:
-            images.append("data:image/png;base64," + tensor_to_base64_string(i, total_pixels=4096 * 4096))
+            images.append("data:image/png;base64," + tensor_to_base64_string(i, total_pixels=4096 * 4096,
+                                                                             mime_type='image/webp'))
+        height, width = cls.cal_output_size(image)
         initial_response = await sync_op(
             cls,
             ApiEndpoint(path="/proxy/wan/api/v1/services/aigc/image2image/image-synthesis", method="POST"),
@@ -369,7 +371,7 @@ class WanImageToImageApi(IO.ComfyNode):
                 model=model,
                 input=Image2ImageInputField(prompt=prompt, negative_prompt=negative_prompt, images=images),
                 parameters=Image2ImageParametersField(
-                    # size=f"{width}*{height}",
+                    size=f"{width}*{height}",
                     seed=seed,
                     watermark=watermark,
                 ),
@@ -386,6 +388,23 @@ class WanImageToImageApi(IO.ComfyNode):
             poll_interval=4,
         )
         return IO.NodeOutput(await download_url_to_image_tensor(str(response.output.results[0].url)))
+
+    @classmethod
+    def cal_output_size(cls, image: torch.Tensor, max_side = 1280):
+        if image.ndim == 3:           # CHW
+            h, w, _ = image.shape
+        elif image.ndim == 4:         # BCHW
+            _, h, w, _ = image.shape
+        else:
+            raise ValueError("Tensor must be CHW or BCHW")
+
+        base = max(w, h)
+        scale = max_side / float(base)
+
+        new_h = int(round(h * scale))
+        new_w = int(round(w * scale))
+
+        return new_h, new_w
 
 
 class WanTextToVideoApi(IO.ComfyNode):

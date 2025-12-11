@@ -390,7 +390,7 @@ class WanImageToImageApi(IO.ComfyNode):
         return IO.NodeOutput(await download_url_to_image_tensor(str(response.output.results[0].url)))
 
     @classmethod
-    def cal_output_size(cls, image: torch.Tensor, max_side = 1440):
+    def cal_output_size(cls, image: torch.Tensor, max_side = 1280):
         if image.ndim == 3:           # CHW
             h, w, _ = image.shape
         elif image.ndim == 4:         # BCHW

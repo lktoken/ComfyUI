@@ -425,6 +425,10 @@ class ByteDanceSeedreamNode(IO.ComfyNode):
                 max_images=n_input_images,
                 mime_type="image/png",
             )
+        output_image_size = f"{w}x{h}"
+        if 'prompt' in size_preset:
+            output_image_size = size_preset[:2]
+
         response = await sync_op(
             cls,
             ApiEndpoint(path=BYTEPLUS_IMAGE_ENDPOINT, method="POST"),
@@ -433,7 +437,7 @@ class ByteDanceSeedreamNode(IO.ComfyNode):
                 model=model,
                 prompt=prompt,
                 image=reference_images_urls,
-                size=f"{w}x{h}",
+                size=output_image_size,
                 seed=seed,
                 sequential_image_generation=sequential_image_generation,
                 sequential_image_generation_options=Seedream4Options(max_images=max_images),
